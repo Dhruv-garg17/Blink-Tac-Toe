@@ -27,7 +27,7 @@ const App = () => {
 
   return (
     <div className="app">
-      <h1 className="title">Blink Tac Toe 🔁</h1>
+      <h1 className="title">Blink Tac Toe</h1>
 
       {!gameStarted ? (
         <CategorySelector

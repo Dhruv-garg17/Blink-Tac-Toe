@@ -12,7 +12,7 @@ const GameBoard = ({ categories, onRestart }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
 
-  // 🔊 Sound refs
+  // Sound refs
   const clickSoundRef = useRef(null);
   const winSoundRef = useRef(null);
 
