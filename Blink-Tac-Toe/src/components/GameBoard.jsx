@@ -2,12 +2,14 @@ import { useState } from "react";
 import "./GameBoard.css";
 import { checkWinner } from "../utils/helpers";
 import EmojiCell from "./EmojiCell";
+import HelpModal from "./HelpModal"; 
 
 const GameBoard = ({ categories, onRestart }) => {
   const [board, setBoard] = useState(Array(9).fill(null));
   const [turn, setTurn] = useState(1);
   const [moves, setMoves] = useState({ 1: [], 2: [] });
   const [winner, setWinner] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const getRandomEmoji = (player) => {
     const playerEmojis = categories[player] || ["❓"];
@@ -87,7 +89,13 @@ const GameBoard = ({ categories, onRestart }) => {
         <button onClick={onRestart} className="restart-button">
           Change Emoji Categories
         </button>
+        <button onClick={() => setShowHelp(true)} className="helper-button">
+          Help ❓
+        </button>
       </div>
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      
     </div>
   );
 };
