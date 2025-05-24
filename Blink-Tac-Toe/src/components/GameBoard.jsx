@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./GameBoard.css";
 import { checkWinner } from "../utils/helpers";
 import EmojiCell from "./EmojiCell";
-import HelpModal from "./HelpModal"; 
+import HelpModal from "./HelpModal";
 
 const GameBoard = ({ categories, onRestart }) => {
   const [board, setBoard] = useState(Array(9).fill(null));
@@ -10,53 +10,68 @@ const GameBoard = ({ categories, onRestart }) => {
   const [moves, setMoves] = useState({ 1: [], 2: [] });
   const [winner, setWinner] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  // 🔊 Sound refs
+  const clickSoundRef = useRef(null);
+  const winSoundRef = useRef(null);
+
+  useEffect(() => {
+    clickSoundRef.current = new Audio("/click-sound.mp3");
+    winSoundRef.current = new Audio("/win-sound.mp3");
+  }, []);
+
+  const playSound = (ref) => {
+    if (!hasInteracted || !ref?.current) return;
+
+    try {
+      ref.current.currentTime = 0;
+      ref.current.play();
+    } catch (error) {
+      console.warn("Sound playback failed:", error);
+    }
+  };
 
   const getRandomEmoji = (player) => {
     const playerEmojis = categories[player] || ["❓"];
-
-    // Emojis already used by this player on the board
     const usedEmojis = board
       .filter((cell) => cell && cell.player === player)
       .map((cell) => cell.emoji);
-
-    // Filter out used emojis so we pick a fresh one
-    const availableEmojis = playerEmojis.filter((e) => !usedEmojis.includes(e));
-
-    // Fallback: if all emojis are used, allow reuse
+    const availableEmojis = playerEmojis.filter(
+      (e) => !usedEmojis.includes(e)
+    );
     const emojiSet = availableEmojis.length > 0 ? availableEmojis : playerEmojis;
-
     return emojiSet[Math.floor(Math.random() * emojiSet.length)];
   };
 
   const handleClick = (index) => {
+    setHasInteracted(true); // unlock sound playback on first click
+
     if (winner || board[index]) return;
 
     const emoji = getRandomEmoji(turn);
     const currentMoves = [...moves[turn]];
     const newBoard = [...board];
 
-    // Handle vanishing emoji (on 4th move)
     if (currentMoves.length === 3) {
       const [oldest] = currentMoves;
-      if (oldest.index === index) return; // Cannot reuse vanished cell
-
-      newBoard[oldest.index] = null; // Remove oldest emoji
-      currentMoves.shift(); // Remove from moves
+      if (oldest.index === index) return;
+      newBoard[oldest.index] = null;
+      currentMoves.shift();
     }
 
-    // Place new emoji
     newBoard[index] = { player: turn, emoji };
     currentMoves.push({ index, emoji });
 
-    // Apply updates
     setBoard(newBoard);
     setMoves((prev) => ({ ...prev, [turn]: currentMoves }));
 
-    // Check for winner
     const indices = currentMoves.map((m) => m.index);
     if (checkWinner(indices)) {
       setWinner(turn);
+      playSound(winSoundRef);
     } else {
+      playSound(clickSoundRef);
       setTurn(turn === 1 ? 2 : 1);
     }
   };
@@ -95,7 +110,6 @@ const GameBoard = ({ categories, onRestart }) => {
       </div>
 
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
-      
     </div>
   );
 };
