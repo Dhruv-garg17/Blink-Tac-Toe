@@ -4,6 +4,7 @@ import GameBoard from "./components/GameBoard";
 import "./App.css";
 
 const App = () => {
+  
   const [categories, setCategories] = useState({ 1: null, 2: null });
   const [gameStarted, setGameStarted] = useState(false);
   const [singlePlayerMode, setSinglePlayerMode] = useState(null); // null, true or false
@@ -41,6 +42,7 @@ const App = () => {
     setGameStarted(false);
     setSinglePlayerMode(null);
   };
+
 
   return (
     <div className="app">

@@ -24,12 +24,12 @@ const getBlockingMove = (board, player) => {
 
   for (const combo of WINNING_COMBOS) {
     const marks = combo.map((i) => board[i]?.player);
-    if (
-      marks.filter((p) => p === player).length === 2 &&
-      marks.includes(null)
-    ) {
+    const playerCount = marks.filter((p) => p === player).length;
+    const emptyCount = marks.filter((p) => p == null).length;
+
+    if (playerCount === 2 && emptyCount === 1) {
       const emptyIndex = combo.find((i) => board[i] === null);
-      if (emptyIndex !== undefined) return emptyIndex;
+      if (emptyIndex !== undefined && emptyIndex !== null) return emptyIndex;
     }
   }
   return null;
@@ -98,7 +98,7 @@ const minimaxMove = (boardState, aiPlayer, depth = 3) => {
   return bestMove;
 };
 
-const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
+const GameBoard = ({ categories, onRestart, singlePlayerMode }) => {
   const [board, setBoard] = useState(Array(9).fill(null));
   const [turn, setTurn] = useState(1);
   const [moves, setMoves] = useState({ 1: [], 2: [] });
@@ -112,7 +112,7 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
   const winSoundRef = useRef(new Audio("/win-sound.mp3"));
 
   const getRandomEmoji = (player) => {
-    const playerEmojis = categories[player] || ["❓"];
+    const playerEmojis = categories[player] || ["🤖"];
     const usedEmojis = board
       .filter((cell) => cell && cell.player === player)
       .map((cell) => cell.emoji);
@@ -136,6 +136,7 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
     const currentMoves = [...moves[player]];
     const newBoard = [...board];
 
+    // If player already has 3 moves, remove the oldest one (Blink Tic Tac Toe rule)
     if (currentMoves.length === 3) {
       const [oldest] = currentMoves;
       newBoard[oldest.index] = null;
@@ -172,21 +173,15 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
 
     let moveIndex;
 
-    if (mode === "single-player-easy") {
-      moveIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
-    } else if (mode === "single-player-medium") {
-      const blockIndex = getBlockingMove(board, 1);
-      moveIndex =
-        blockIndex !== null
-          ? blockIndex
-          : emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
-    } else if (mode === "single-player-hard") {
+
+    const blockIndex = getBlockingMove(board, 1);
+    if (blockIndex !== null) {
+      moveIndex = blockIndex;
+    } else {
       moveIndex = minimaxMove(board, 2);
       if (moveIndex === null) {
         moveIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
       }
-    } else {
-      moveIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
     }
 
     placeMove(moveIndex, 2);
@@ -194,28 +189,31 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
 
   const handleClick = (index) => {
     if (winner || board[index]) return;
-    if (mode !== "two-player" && turn === 2) return;
+
+    // In single player mode, ignore clicks if it's AI's turn
+    if (singlePlayerMode && turn === 2) return;
+
     placeMove(index, turn);
   };
 
   // AI Move on turn change
   useEffect(() => {
     if (winner) return;
-    if (mode !== "two-player" && turn === 2) {
+    if (singlePlayerMode && turn === 2) {
       const aiTimeout = setTimeout(() => {
         makeAIMove();
       }, 700);
       return () => clearTimeout(aiTimeout);
     }
-  }, [turn, mode, winner, board]);
+  }, [turn, singlePlayerMode, winner, board]);
 
   // Timer countdown and timeout logic
   useEffect(() => {
     if (winner) return;
-    if (mode !== "two-player" && turn === 2) return;
+    if (singlePlayerMode && turn === 2) return;
 
     if (timeLeft <= 0) {
-      if (mode === "two-player") {
+      if (!singlePlayerMode) {
         const emptyIndices = getEmptyIndices(board);
         if (emptyIndices.length > 0) {
           const randomIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
@@ -224,7 +222,7 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
         setTurn(turn === 1 ? 2 : 1);
         setTimeLeft(TURN_TIME_LIMIT);
       } else {
-        setTurn(2); 
+        setTurn(2);
         setTimeLeft(TURN_TIME_LIMIT);
       }
       return;
@@ -232,7 +230,7 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
 
     const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
     return () => clearTimeout(timer);
-  }, [timeLeft, turn, winner, mode, board]);
+  }, [timeLeft, turn, winner, singlePlayerMode, board]);
 
   const resetBoard = () => {
     setBoard(Array(9).fill(null));
@@ -252,7 +250,7 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
           : `Player ${turn}'s Turn (${timeLeft}s left)`}
       </h2>
 
-      <div className="board">
+      <div className={`board ${singlePlayerMode && turn === 2 ? "disabled" : ""}`}>
         {board.map((cell, i) => (
           <EmojiCell
             key={i}
@@ -261,6 +259,9 @@ const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
             animationClass={i === lastPlacedIndex ? lastAnimation : ""}
           />
         ))}
+        {singlePlayerMode && turn === 2 && (
+          <div className="overlay">AI is thinking...</div>
+        )}
       </div>
 
       <div className="controls">
