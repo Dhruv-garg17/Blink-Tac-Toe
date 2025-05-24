@@ -29,6 +29,48 @@ const GameBoard = ({ categories, onRestart }) => {
     return emojiSet[Math.floor(Math.random() * emojiSet.length)];
   };
 
+  // Function to place emoji automatically on a random empty cell
+  const autoPlayMove = () => {
+    if (winner) return;
+
+    // Get empty cells indexes
+    const emptyIndices = board
+      .map((cell, idx) => (cell === null ? idx : null))
+      .filter((idx) => idx !== null);
+
+    if (emptyIndices.length === 0) return; 
+
+    const randomIndex =
+      emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+
+    const emoji = getRandomEmoji(turn);
+    const currentMoves = [...moves[turn]];
+    const newBoard = [...board];
+
+    if (currentMoves.length === 3) {
+      const [oldest] = currentMoves;
+      newBoard[oldest.index] = null;
+      currentMoves.shift();
+    }
+
+    newBoard[randomIndex] = { player: turn, emoji };
+    currentMoves.push({ index: randomIndex, emoji });
+
+    setBoard(newBoard);
+    setMoves((prev) => ({ ...prev, [turn]: currentMoves }));
+
+    const indices = currentMoves.map((m) => m.index);
+    if (checkWinner(indices)) {
+      setWinner(turn);
+      winSoundRef.current.currentTime = 0;
+      winSoundRef.current.play();
+    } else {
+      clickSoundRef.current.currentTime = 0;
+      clickSoundRef.current.play();
+      setTurn(turn === 1 ? 2 : 1);
+    }
+  };
+
   const handleClick = (index) => {
     if (winner || board[index]) return;
 
@@ -77,7 +119,7 @@ const GameBoard = ({ categories, onRestart }) => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev === 1) {
-          setTurn((prevTurn) => (prevTurn === 1 ? 2 : 1)); // Skip turn
+          autoPlayMove();
           return TURN_TIME_LIMIT;
         }
         return prev - 1;
@@ -85,7 +127,7 @@ const GameBoard = ({ categories, onRestart }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [turn, winner]);
+  }, [turn, winner, board]); 
 
   return (
     <div className="game-container">
