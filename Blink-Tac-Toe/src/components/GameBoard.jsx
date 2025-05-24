@@ -4,7 +4,7 @@ import { checkWinner } from "../utils/helpers";
 import EmojiCell from "./EmojiCell";
 import HelpModal from "./HelpModal";
 
-const TURN_TIME_LIMIT = 10; // seconds
+const TURN_TIME_LIMIT = 10;
 
 const animationClasses = [
   "emoji-animate-bounce",
@@ -12,15 +12,99 @@ const animationClasses = [
   "emoji-animate-shake",
 ];
 
-const GameBoard = ({ categories, onRestart }) => {
+const getEmptyIndices = (board) =>
+  board.map((c, i) => (c === null ? i : null)).filter((i) => i !== null);
+
+const getBlockingMove = (board, player) => {
+  const WINNING_COMBOS = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6],
+  ];
+
+  for (const combo of WINNING_COMBOS) {
+    const marks = combo.map((i) => board[i]?.player);
+    if (
+      marks.filter((p) => p === player).length === 2 &&
+      marks.includes(null)
+    ) {
+      const emptyIndex = combo.find((i) => board[i] === null);
+      if (emptyIndex !== undefined) return emptyIndex;
+    }
+  }
+  return null;
+};
+
+const minimaxMove = (boardState, aiPlayer, depth = 3) => {
+  const scores = { 2: 10, 1: -10, tie: 0 };
+
+  const getWinnerForBoard = (boardCheck) => {
+    const WINNING_COMBOS = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6],
+    ];
+    for (const combo of WINNING_COMBOS) {
+      const marks = combo.map(i => boardCheck[i]?.player);
+      if (marks.every(p => p === 2)) return 2;
+      if (marks.every(p => p === 1)) return 1;
+    }
+    if (boardCheck.every(cell => cell !== null)) return 'tie';
+    return null;
+  };
+
+  const getEmptySpots = (boardCheck) =>
+    boardCheck.map((c, i) => (c === null ? i : null)).filter((i) => i !== null);
+
+  const minimax = (boardCheck, player, currentDepth) => {
+    const result = getWinnerForBoard(boardCheck);
+    if (result !== null) return scores[result];
+    if (currentDepth === 0) return 0;
+
+    const emptySpots = getEmptySpots(boardCheck);
+
+    if (player === aiPlayer) {
+      let maxEval = -Infinity;
+      for (const idx of emptySpots) {
+        const newBoard = [...boardCheck];
+        newBoard[idx] = { player };
+        const evalScore = minimax(newBoard, 3 - player, currentDepth - 1);
+        maxEval = Math.max(maxEval, evalScore);
+      }
+      return maxEval;
+    } else {
+      let minEval = Infinity;
+      for (const idx of emptySpots) {
+        const newBoard = [...boardCheck];
+        newBoard[idx] = { player };
+        const evalScore = minimax(newBoard, 3 - player, currentDepth - 1);
+        minEval = Math.min(minEval, evalScore);
+      }
+      return minEval;
+    }
+  };
+
+  let bestScore = -Infinity;
+  let bestMove = null;
+  for (const idx of getEmptyIndices(boardState)) {
+    const newBoard = [...boardState];
+    newBoard[idx] = { player: aiPlayer };
+    const score = minimax(newBoard, 3 - aiPlayer, depth - 1);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = idx;
+    }
+  }
+  return bestMove;
+};
+
+const GameBoard = ({ categories, onRestart, mode = "two-player" }) => {
   const [board, setBoard] = useState(Array(9).fill(null));
   const [turn, setTurn] = useState(1);
   const [moves, setMoves] = useState({ 1: [], 2: [] });
   const [winner, setWinner] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [timeLeft, setTimeLeft] = useState(TURN_TIME_LIMIT);
-
-  // Track last placed cell and its animation class
   const [lastPlacedIndex, setLastPlacedIndex] = useState(null);
   const [lastAnimation, setLastAnimation] = useState(null);
 
@@ -45,21 +129,11 @@ const GameBoard = ({ categories, onRestart }) => {
     ];
   };
 
-  // Function to place emoji automatically on a random empty cell
-  const autoPlayMove = () => {
-    if (winner) return;
+  const placeMove = (index, player) => {
+    if (winner || board[index]) return false;
 
-    const emptyIndices = board
-      .map((cell, idx) => (cell === null ? idx : null))
-      .filter((idx) => idx !== null);
-
-    if (emptyIndices.length === 0) return;
-
-    const randomIndex =
-      emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
-
-    const emoji = getRandomEmoji(turn);
-    const currentMoves = [...moves[turn]];
+    const emoji = getRandomEmoji(player);
+    const currentMoves = [...moves[player]];
     const newBoard = [...board];
 
     if (currentMoves.length === 3) {
@@ -68,62 +142,97 @@ const GameBoard = ({ categories, onRestart }) => {
       currentMoves.shift();
     }
 
-    newBoard[randomIndex] = { player: turn, emoji };
-    currentMoves.push({ index: randomIndex, emoji });
-
-    setBoard(newBoard);
-    setMoves((prev) => ({ ...prev, [turn]: currentMoves }));
-
-    setLastPlacedIndex(randomIndex);
-    setLastAnimation(getRandomAnimation());
-
-    const indices = currentMoves.map((m) => m.index);
-    if (checkWinner(indices)) {
-      setWinner(turn);
-      winSoundRef.current.currentTime = 0;
-      winSoundRef.current.play();
-    } else {
-      clickSoundRef.current.currentTime = 0;
-      clickSoundRef.current.play();
-      setTurn(turn === 1 ? 2 : 1);
-    }
-  };
-
-  const handleClick = (index) => {
-    if (winner || board[index]) return;
-
-    const emoji = getRandomEmoji(turn);
-    const currentMoves = [...moves[turn]];
-    const newBoard = [...board];
-
-    if (currentMoves.length === 3) {
-      const [oldest] = currentMoves;
-      if (oldest.index === index) return;
-      newBoard[oldest.index] = null;
-      currentMoves.shift();
-    }
-
-    newBoard[index] = { player: turn, emoji };
+    newBoard[index] = { player, emoji };
     currentMoves.push({ index, emoji });
 
     setBoard(newBoard);
-    setMoves((prev) => ({ ...prev, [turn]: currentMoves }));
-
+    setMoves((prev) => ({ ...prev, [player]: currentMoves }));
     setLastPlacedIndex(index);
     setLastAnimation(getRandomAnimation());
 
     const indices = currentMoves.map((m) => m.index);
     if (checkWinner(indices)) {
-      setWinner(turn);
+      setWinner(player);
       winSoundRef.current.currentTime = 0;
       winSoundRef.current.play();
     } else {
       clickSoundRef.current.currentTime = 0;
       clickSoundRef.current.play();
-      setTurn(turn === 1 ? 2 : 1);
+      setTurn(player === 1 ? 2 : 1);
       setTimeLeft(TURN_TIME_LIMIT);
     }
+    return true;
   };
+
+  const makeAIMove = () => {
+    if (winner) return;
+
+    const emptyIndices = getEmptyIndices(board);
+    if (emptyIndices.length === 0) return;
+
+    let moveIndex;
+
+    if (mode === "single-player-easy") {
+      moveIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+    } else if (mode === "single-player-medium") {
+      const blockIndex = getBlockingMove(board, 1);
+      moveIndex =
+        blockIndex !== null
+          ? blockIndex
+          : emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+    } else if (mode === "single-player-hard") {
+      moveIndex = minimaxMove(board, 2);
+      if (moveIndex === null) {
+        moveIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+      }
+    } else {
+      moveIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+    }
+
+    placeMove(moveIndex, 2);
+  };
+
+  const handleClick = (index) => {
+    if (winner || board[index]) return;
+    if (mode !== "two-player" && turn === 2) return;
+    placeMove(index, turn);
+  };
+
+  // AI Move on turn change
+  useEffect(() => {
+    if (winner) return;
+    if (mode !== "two-player" && turn === 2) {
+      const aiTimeout = setTimeout(() => {
+        makeAIMove();
+      }, 700);
+      return () => clearTimeout(aiTimeout);
+    }
+  }, [turn, mode, winner, board]);
+
+  // Timer countdown and timeout logic
+  useEffect(() => {
+    if (winner) return;
+    if (mode !== "two-player" && turn === 2) return;
+
+    if (timeLeft <= 0) {
+      if (mode === "two-player") {
+        const emptyIndices = getEmptyIndices(board);
+        if (emptyIndices.length > 0) {
+          const randomIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+          placeMove(randomIndex, turn);
+        }
+        setTurn(turn === 1 ? 2 : 1);
+        setTimeLeft(TURN_TIME_LIMIT);
+      } else {
+        setTurn(2); 
+        setTimeLeft(TURN_TIME_LIMIT);
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, turn, winner, mode, board]);
 
   const resetBoard = () => {
     setBoard(Array(9).fill(null));
@@ -134,23 +243,6 @@ const GameBoard = ({ categories, onRestart }) => {
     setLastPlacedIndex(null);
     setLastAnimation(null);
   };
-
-  // Timer effect
-  useEffect(() => {
-    if (winner) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === 1) {
-          autoPlayMove();
-          return TURN_TIME_LIMIT;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [turn, winner, board]);
 
   return (
     <div className="game-container">

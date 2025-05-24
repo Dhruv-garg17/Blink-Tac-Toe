@@ -12,7 +12,7 @@ const HelpModal = ({ onClose }) => {
           <li>When placing a 4th, the oldest one vanishes — you can't reuse that cell immediately.</li>
           <li>Form a line of 3 emojis to win — horizontally, vertically, or diagonally!</li>
         </ul>
-        <button onClick={onClose}>Got it!</button>
+        <button onClick={onClose} className="got-it">Got it!</button>
       </div>
     </div>
   );

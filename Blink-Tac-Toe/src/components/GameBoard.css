@@ -26,6 +26,19 @@
   background: #e0e0e0;
 }
 
+
+.helper-button{
+  background-color: lightgray;
+}
+
+.restart-button{
+  background-color: lightgray;
+}
+
+.reset-button{
+  background-color: lightgray;
+}
+
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-15px); }
