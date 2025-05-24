@@ -1,7 +1,11 @@
-const EmojiCell = ({ value, onClick }) => {
+const EmojiCell = ({ value, onClick, animationClass }) => {
   return (
-    <div className="cell" onClick={onClick}>
-      {value?.emoji}
+    <div className="emoji-cell" onClick={onClick}>
+      {value ? (
+        <span className={`emoji ${animationClass || ""}`}>
+          {value.emoji}
+        </span>
+      ) : null}
     </div>
   );
 };

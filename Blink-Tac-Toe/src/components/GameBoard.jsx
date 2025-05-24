@@ -6,6 +6,12 @@ import HelpModal from "./HelpModal";
 
 const TURN_TIME_LIMIT = 10; // seconds
 
+const animationClasses = [
+  "emoji-animate-bounce",
+  "emoji-animate-spin",
+  "emoji-animate-shake",
+];
+
 const GameBoard = ({ categories, onRestart }) => {
   const [board, setBoard] = useState(Array(9).fill(null));
   const [turn, setTurn] = useState(1);
@@ -13,6 +19,10 @@ const GameBoard = ({ categories, onRestart }) => {
   const [winner, setWinner] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [timeLeft, setTimeLeft] = useState(TURN_TIME_LIMIT);
+
+  // Track last placed cell and its animation class
+  const [lastPlacedIndex, setLastPlacedIndex] = useState(null);
+  const [lastAnimation, setLastAnimation] = useState(null);
 
   const clickSoundRef = useRef(new Audio("/click-sound.mp3"));
   const winSoundRef = useRef(new Audio("/win-sound.mp3"));
@@ -29,16 +39,21 @@ const GameBoard = ({ categories, onRestart }) => {
     return emojiSet[Math.floor(Math.random() * emojiSet.length)];
   };
 
+  const getRandomAnimation = () => {
+    return animationClasses[
+      Math.floor(Math.random() * animationClasses.length)
+    ];
+  };
+
   // Function to place emoji automatically on a random empty cell
   const autoPlayMove = () => {
     if (winner) return;
 
-    // Get empty cells indexes
     const emptyIndices = board
       .map((cell, idx) => (cell === null ? idx : null))
       .filter((idx) => idx !== null);
 
-    if (emptyIndices.length === 0) return; 
+    if (emptyIndices.length === 0) return;
 
     const randomIndex =
       emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
@@ -58,6 +73,9 @@ const GameBoard = ({ categories, onRestart }) => {
 
     setBoard(newBoard);
     setMoves((prev) => ({ ...prev, [turn]: currentMoves }));
+
+    setLastPlacedIndex(randomIndex);
+    setLastAnimation(getRandomAnimation());
 
     const indices = currentMoves.map((m) => m.index);
     if (checkWinner(indices)) {
@@ -91,6 +109,9 @@ const GameBoard = ({ categories, onRestart }) => {
     setBoard(newBoard);
     setMoves((prev) => ({ ...prev, [turn]: currentMoves }));
 
+    setLastPlacedIndex(index);
+    setLastAnimation(getRandomAnimation());
+
     const indices = currentMoves.map((m) => m.index);
     if (checkWinner(indices)) {
       setWinner(turn);
@@ -110,6 +131,8 @@ const GameBoard = ({ categories, onRestart }) => {
     setMoves({ 1: [], 2: [] });
     setWinner(null);
     setTimeLeft(TURN_TIME_LIMIT);
+    setLastPlacedIndex(null);
+    setLastAnimation(null);
   };
 
   // Timer effect
@@ -127,7 +150,7 @@ const GameBoard = ({ categories, onRestart }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [turn, winner, board]); 
+  }, [turn, winner, board]);
 
   return (
     <div className="game-container">
@@ -139,7 +162,12 @@ const GameBoard = ({ categories, onRestart }) => {
 
       <div className="board">
         {board.map((cell, i) => (
-          <EmojiCell key={i} value={cell} onClick={() => handleClick(i)} />
+          <EmojiCell
+            key={i}
+            value={cell}
+            onClick={() => handleClick(i)}
+            animationClass={i === lastPlacedIndex ? lastAnimation : ""}
+          />
         ))}
       </div>
 
